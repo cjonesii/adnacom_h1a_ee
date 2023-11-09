@@ -1156,6 +1156,16 @@ static void show(void)
       show_verbose(d);
 }
 
+static int delete_adna_list(void)
+{
+  struct adna_device *a, *b;
+  for (a=first_adna;a;a=b) {
+    b=a->next;
+    free(a);
+  }
+  return 0;
+}
+
 static int save_to_adna_list(void)
 {
   struct device *d;
@@ -1767,5 +1777,6 @@ int main(int argc, char **argv)
     goto __exit;
 
 __exit:
+  delete_adna_list();
   return (seen_errors ? 2 : 0);
 }
