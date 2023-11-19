@@ -1616,10 +1616,10 @@ static void DisplayHelp(void)
         "\n"
         "EEPROM file utility for Adnacom devices.\n"
         "\n"
-        " Usage: adna [-l|-s file | -e] [-n serial_num] [-v]\n"
+        " Usage: adna [-w|-s file | -e] [-n serial_num] [-v]\n"
         "\n"
         " Options:\n"
-        "   -l | -s       Load (-l) file to EEPROM -OR- Save (-s) EEPROM to file\n"
+        "   -w | -s       Write (-w) file to EEPROM -OR- Save (-s) EEPROM to file\n"
         "   file          Specifies the file to load or save\n"
         "   -e            Enumerate (-e) Adnacom devices\n"
         "   -n            Specifies the serial number to write\n"
@@ -1628,7 +1628,7 @@ static void DisplayHelp(void)
         "\n"
         "  Sample command\n"
         "  -----------------\n"
-        "  adna -l MyEeprom.bin\n"
+        "  adna -w MyEeprom.bin\n"
         "\n"
         );
 }
@@ -1680,7 +1680,7 @@ static uint8_t ProcessCommandLine(int argc, char *argv[])
             return EXIT_FAILURE;
         } else if (strcasecmp(argv[i], "-v") == 0) {
             EepOptions.bVerbose = true;
-        } else if (strcasecmp(argv[i], "-l") == 0) {
+        } else if (strcasecmp(argv[i], "-w") == 0) {
             EepOptions.bLoadFile = true;
 
             // Set flag to get file name
