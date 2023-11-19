@@ -1,3 +1,7 @@
+
+# Makefile for H1A EEPROM Tool
+# (c) 2022--2023 Adnacom, Inc.
+# Based on
 # Makefile for The PCI Utilities
 # (c) 1998--2020 Martin Mares <mj@ucw.cz>
 
@@ -41,6 +45,14 @@ INCDIR=$(PREFIX)/include
 LIBDIR=$(PREFIX)/lib
 PKGCFDIR=$(LIBDIR)/pkgconfig
 
+# 
+TARGET_EXEC := h1a_ee
+BUILD_DIR := ./build
+SRC_DIRS := ./src
+SRCS := $(shell find $(SRC_DIRS) -name '*.cpp' -or -name '*.c')
+OBJS := $(SRCS:%=$(BUILD_DIR)/%.o)
+DEPS := $(OBJS:.o=.d)
+
 # Commands
 INSTALL=install
 DIRINSTALL=install -d
@@ -59,7 +71,7 @@ PCIINC_INS=lib/config.h lib/header.h lib/pci.h lib/types.h
 
 export
 
-all: lib/$(PCILIB) adna
+all: lib/$(PCILIB) $(TARGET_EXEC)
 
 lib/$(PCILIB): $(PCIINC) force
 	$(MAKE) -C lib all
@@ -69,26 +81,16 @@ force:
 lib/config.h lib/config.mk:
 	cd lib && ./configure
 
-adna: adna.o setpci.o ls-vpd.o ls-caps.o ls-caps-vendor.o ls-ecaps.o ls-kernel.o ls-tree.o ls-map.o common.o lib/$(PCILIB)
+$(TARGET_EXEC): LDLIBS+=$(LIBKMOD_LIBS)
+$(BUILD_DIR)/ls-kernel.c.o: CFLAGS+=$(LIBKMOD_CFLAGS)
 
-LSPCIINC=adna.h pciutils.h $(PCIINC)
-adna.o: adna.c $(LSPCIINC)
-ls-vpd.o: ls-vpd.c $(LSPCIINC)
-ls-caps.o: ls-caps.c $(LSPCIINC)
-ls-ecaps.o: ls-ecaps.c $(LSPCIINC)
-ls-kernel.o: ls-kernel.c $(LSPCIINC)
-ls-tree.o: ls-tree.c $(LSPCIINC)
-ls-map.o: ls-map.c $(LSPCIINC)
-common.o: common.c pciutils.h $(PCIINC)
+LSPCIINC=$(SRC_DIRS)/adna.h $(SRC_DIRS)/pciutils.h $(PCIINC)
 
-adna: LDLIBS+=$(LIBKMOD_LIBS)
-ls-kernel.o: CFLAGS+=$(LIBKMOD_CFLAGS)
-adna: adna.o lib/$(PCILIB)
-adna.o: adna.c $(PCIINC)
-setpci.o: setpci.c $(PCIINC)
+$(TARGET_EXEC): $(OBJS) lib/$(PCILIB)
+	$(CC) $(LDFLAGS) $(TARGET_ARCH) $^ $(LDLIBS) -o $@ 
 
-%: %.o
-	$(CC) $(LDFLAGS) $(TARGET_ARCH) $^ $(LDLIBS) -o $@
+$(BUILD_DIR)/%.c.o: %.c
+	$(CC) $(CPPFLAGS) $(CFLAGS) -c $< -o $@
 
 %.8 %.7 %.5: %.man
 	M=`echo $(DATE) | sed 's/-01-/-January-/;s/-02-/-February-/;s/-03-/-March-/;s/-04-/-April-/;s/-05-/-May-/;s/-06-/-June-/;s/-07-/-July-/;s/-08-/-August-/;s/-09-/-September-/;s/-10-/-October-/;s/-11-/-November-/;s/-12-/-December-/;s/\(.*\)-\(.*\)-\(.*\)/\3 \2 \1/'` ; sed <$< >$@ "s/@TODAY@/$$M/;s/@VERSION@/pciutils-$(VERSION)/;s#@IDSDIR@#$(IDSDIR)#"
@@ -103,14 +105,14 @@ TAGS:
 
 clean:
 	rm -f `find . -name "*~" -o -name "*.[oa]" -o -name "\#*\#" -o -name TAGS -o -name core -o -name "*.orig"`
-	rm -f adna lib/config.* *.[578] lib/*.pc lib/*.so lib/*.so.* tags
+	rm -f $(TARGET_EXEC) lib/config.* *.[578] lib/*.pc lib/*.so lib/*.so.* tags
 	rm -rf maint/dist
 
 distclean: clean
 
 install: all
 # -c is ignored on Linux, but required on FreeBSD
-	$(INSTALL) -c -m 755 $(STRIP) adna $(DESTDIR)$(SBINDIR)
+	$(INSTALL) -c -m 755 $(STRIP) $(TARGET_EXEC) $(DESTDIR)$(SBINDIR)
 
 ifeq ($(SHARED),yes)
 ifeq ($(LIBEXT),dylib)
@@ -141,7 +143,7 @@ endif
 endif
 
 uninstall: all
-	rm -f $(DESTDIR)$(SBINDIR)/adna $(DESTDIR)$(SBINDIR)/setpci $(DESTDIR)$(SBINDIR)/update-pciids
+	rm -f $(DESTDIR)$(SBINDIR)/$(TARGET_EXEC) $(DESTDIR)$(SBINDIR)/setpci $(DESTDIR)$(SBINDIR)/update-pciids
 ifeq ($(SHARED),yes)
 	rm -f $(DESTDIR)$(LIBDIR)/$(PCILIB) $(DESTDIR)$(LIBDIR)/$(LIBNAME).so$(ABI_VERSION)
 endif

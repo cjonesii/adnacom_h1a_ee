@@ -9,8 +9,8 @@
 #define __PCIUTILS_H__
 
 
-#include "lib/pci.h"
-#include "lib/sysdep.h"
+#include "../lib/pci.h"
+#include "../lib/sysdep.h"
 
 #ifdef PCI_OS_WINDOWS
 #include "compat/getopt.h"
