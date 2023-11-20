@@ -278,9 +278,9 @@ static void eep_data(struct device *d, uint32_t cmd, volatile uint32_t *buffer)
     if (EepOptions.bVerbose)
         printf("Function: %s\n", __func__);
 
-    check_for_ready_or_done(d);
     if (EepOptions.bVerbose)
         printf("  EEPROM Control: 0x%08x\n", cmd);
+    check_for_ready_or_done(d);
     pcimem(d->dev, EEP_STAT_N_CTRL_ADDR, cmd);
     check_for_ready_or_done(d);
 
@@ -289,6 +289,7 @@ static void eep_data(struct device *d, uint32_t cmd, volatile uint32_t *buffer)
         if (EepOptions.bVerbose)
             printf("Read buffer: 0x%08x\n", *buffer);
     }
+    check_for_ready_or_done(d);
 }
 
 void eep_read(struct device *d, uint32_t offset, volatile uint32_t *read_buffer)
@@ -325,13 +326,15 @@ void eep_write(struct device *d, uint32_t offset, uint32_t write_buffer)
         printf("Function: %s\n", __func__);
     union eep_status_and_control_reg ctrl_reg = {0};
 
-    check_for_ready_or_done(d);
     // Section 6.8.1 step#2
+    check_for_ready_or_done(d);
     pcimem(d->dev, EEP_BUFFER_ADDR, write_buffer);
     check_for_ready_or_done(d);
     // Section 6.8.1 step#3
     ctrl_reg.cmd_n_status_struct.cmd = SET_WR_EN_LATCH;
+    check_for_ready_or_done(d);
     pcimem(d->dev, EEP_STAT_N_CTRL_ADDR, ctrl_reg.cmd_u32);
+    check_for_ready_or_done(d);
     // Section 6.8.1 step#4
     ctrl_reg.cmd_n_status_struct.cmd = WR_4B_FR_BUFF_TO_BLKADDR;
     ctrl_reg.cmd_n_status_struct.blk_addr = offset;
@@ -347,13 +350,15 @@ void eep_write_16(struct device *d, uint32_t offset, uint16_t write_buffer)
     union eep_status_and_control_reg ctrl_reg = {0};
     uint32_t buffer_32 = (uint32_t)write_buffer;
 
-    check_for_ready_or_done(d);
     // Section 6.8.1 step#2
+    check_for_ready_or_done(d);
     pcimem(d->dev, EEP_BUFFER_ADDR, buffer_32);
     check_for_ready_or_done(d);
     // Section 6.8.1 step#3
     ctrl_reg.cmd_n_status_struct.cmd = SET_WR_EN_LATCH;
+    check_for_ready_or_done(d);
     pcimem(d->dev, EEP_STAT_N_CTRL_ADDR, ctrl_reg.cmd_u32);
+    check_for_ready_or_done(d);
     // Section 6.8.1 step#4
     ctrl_reg.cmd_n_status_struct.cmd = WR_4B_FR_BUFF_TO_BLKADDR;
     ctrl_reg.cmd_n_status_struct.blk_addr = offset;
@@ -369,12 +374,16 @@ void eep_init(struct device *d)
     union eep_status_and_control_reg ctrl_reg = {0};
 
     // Section 6.8.3 step#2
+    check_for_ready_or_done(d);
     pcimem(d->dev, EEP_BUFFER_ADDR, EEP_INIT_VAL);
+    check_for_ready_or_done(d);
     // Section 6.8.3 step#3
     ctrl_reg.cmd_n_status_struct.cmd = SET_WR_EN_LATCH;
     ctrl_reg.cmd_n_status_struct.addr_width_override = ADDR_WIDTH_WRITABLE;
     ctrl_reg.cmd_n_status_struct.addr_width = TWO_BYTES;
+    check_for_ready_or_done(d);
     pcimem(d->dev, EEP_STAT_N_CTRL_ADDR, ctrl_reg.cmd_u32);
+    check_for_ready_or_done(d);
     // Section 6.8.3 step#4
     ctrl_reg.cmd_n_status_struct.cmd = WR_4B_FR_BUFF_TO_BLKADDR;
     ctrl_reg.cmd_n_status_struct.addr_width_override = ADDR_WIDTH_WRITABLE;
@@ -1572,8 +1581,9 @@ static int eep_process(int j)
         if ((a->bus == d->dev->bus) &&
             (a->dev == d->dev->dev) &&
             (a->func == d->dev->func)) { // to locate the pci dev
-
+          check_for_ready_or_done(d);
           read = pcimem(d->dev, EEP_STAT_N_CTRL_ADDR, 0);
+          check_for_ready_or_done(d);
           if (read == PCI_MEM_ERROR) {
             printf("Unexpected error. Exiting.\n");
             exit(-1);
