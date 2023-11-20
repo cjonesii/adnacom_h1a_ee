@@ -348,7 +348,7 @@ void eep_write_16(struct device *d, uint32_t offset, uint16_t write_buffer)
     if (EepOptions.bVerbose)
         printf("Function: %s\n", __func__);
     union eep_status_and_control_reg ctrl_reg = {0};
-    uint32_t buffer_32 = (uint32_t)write_buffer;
+    uint32_t buffer_32 = (uint32_t)write_buffer << 16;
 
     // Section 6.8.1 step#2
     check_for_ready_or_done(d);
