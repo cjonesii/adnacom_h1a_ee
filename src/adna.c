@@ -1394,7 +1394,7 @@ static uint8_t EepromFileLoad(struct device *d)
     printf("Program EEPROM..... \n");
 
     // Write 32-bit aligned buffer into EEPROM
-    for (offset = 0, four_byte_count = 0; offset < (FileSize & ~0x3); four_byte_count++, offset += sizeof(uint32_t))
+    for (offset = 0, four_byte_count = 0; offset <= (FileSize & ~0x3); four_byte_count++, offset += sizeof(uint32_t))
     {
         // Periodically update status
         if ((offset & 0x7) == 0) {
