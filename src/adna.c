@@ -1424,12 +1424,12 @@ static uint8_t EepromFileLoad(struct device *d)
         value = *(uint16_t*)(g_pBuffer + offset);
 
         // Write value & read back to verify
-        eep_write_16(d, offset, (uint16_t)value);
-        eep_read_16(d, offset, &Verify_Value_16);
+        eep_write_16(d, four_byte_count+1, (uint16_t)value);
+        eep_read_16(d, four_byte_count+1, &Verify_Value_16);
 
         if (Verify_Value_16 != (uint16_t)value) {
             printf("ERROR: offset:%02X  wrote:%04X  read:%04X\n",
-                   offset, value, Verify_Value_16);
+                   offset + sizeof(uint32_t), value, Verify_Value_16);
             goto _Exit_File_Load;
         }
     }
