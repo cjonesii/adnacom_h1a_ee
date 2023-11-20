@@ -316,7 +316,7 @@ void eep_read_16(struct device *d, uint32_t offset, uint16_t *read_buffer)
     ctrl_reg.cmd_n_status_struct.blk_addr = offset;
     eep_data(d, ctrl_reg.cmd_u32, &buffer_32);
 
-    *read_buffer = buffer_32 & 0xFFFF;
+    *read_buffer = (buffer_32 >> 16) & 0xFFFF;
     fflush(stdout);
 }
 
