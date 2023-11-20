@@ -1429,7 +1429,7 @@ static uint8_t EepromFileLoad(struct device *d)
 
         if (Verify_Value_16 != (uint16_t)value) {
             printf("ERROR: offset:%02X  wrote:%04X  read:%04X\n",
-                   offset + sizeof(uint32_t), value, Verify_Value_16);
+                   offset, value, Verify_Value_16);
             goto _Exit_File_Load;
         }
     }
