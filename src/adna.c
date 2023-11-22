@@ -372,25 +372,30 @@ void eep_init(struct device *d)
     if (EepOptions.bVerbose)
         printf("Function: %s\n", __func__);
     union eep_status_and_control_reg ctrl_reg = {0};
+    uint32_t init_buffer[3] = {0x00060005,
+                               0x34120042,
+                               0xffff7856};
 
-    // Section 6.8.3 step#2
-    check_for_ready_or_done(d);
-    pcimem(d->dev, EEP_BUFFER_ADDR, EEP_INIT_VAL);
-    check_for_ready_or_done(d);
-    // Section 6.8.3 step#3
-    ctrl_reg.cmd_n_status_struct.cmd = SET_WR_EN_LATCH;
-    ctrl_reg.cmd_n_status_struct.addr_width_override = ADDR_WIDTH_WRITABLE;
-    ctrl_reg.cmd_n_status_struct.addr_width = TWO_BYTES;
-    check_for_ready_or_done(d);
-    pcimem(d->dev, EEP_STAT_N_CTRL_ADDR, ctrl_reg.cmd_u32);
-    check_for_ready_or_done(d);
-    // Section 6.8.3 step#4
-    ctrl_reg.cmd_n_status_struct.cmd = WR_4B_FR_BUFF_TO_BLKADDR;
-    ctrl_reg.cmd_n_status_struct.addr_width_override = ADDR_WIDTH_WRITABLE;
-    ctrl_reg.cmd_n_status_struct.addr_width = TWO_BYTES;
-    eep_data(d, ctrl_reg.cmd_u32, NULL);
+    for (int i = 0; i < 3; i++) {
+      // Section 6.8.3 step#2
+      check_for_ready_or_done(d);
+      pcimem(d->dev, EEP_BUFFER_ADDR, init_buffer[i]);
+      check_for_ready_or_done(d);
+      // Section 6.8.3 step#3
+      ctrl_reg.cmd_n_status_struct.cmd = SET_WR_EN_LATCH;
+      ctrl_reg.cmd_n_status_struct.addr_width_override = ADDR_WIDTH_WRITABLE;
+      ctrl_reg.cmd_n_status_struct.addr_width = TWO_BYTES;
+      check_for_ready_or_done(d);
+      pcimem(d->dev, EEP_STAT_N_CTRL_ADDR, ctrl_reg.cmd_u32);
+      check_for_ready_or_done(d);
+      // Section 6.8.3 step#4
+      ctrl_reg.cmd_n_status_struct.cmd = WR_4B_FR_BUFF_TO_BLKADDR;
+      ctrl_reg.cmd_n_status_struct.addr_width_override = ADDR_WIDTH_WRITABLE;
+      ctrl_reg.cmd_n_status_struct.addr_width = TWO_BYTES;
+      eep_data(d, ctrl_reg.cmd_u32, NULL);
+    }
 
-    printf("EEPROM initialized done\n");
+    printf("EEPROM initialization done\n");
     fflush(stdout);
 }
 
