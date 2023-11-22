@@ -390,7 +390,7 @@ void eep_init(struct device *d)
     ctrl_reg.cmd_n_status_struct.addr_width = TWO_BYTES;
     eep_data(d, ctrl_reg.cmd_u32, NULL);
 
-    printf("EEPROM was initialized. Please restart your system for changes to take effect.\n");
+    printf("EEPROM initialized done\n");
     fflush(stdout);
 }
 
@@ -1608,9 +1608,9 @@ static int eep_process(int j)
               status = EXIT_SUCCESS;
           break;
           case PRSNT_INVALID:
-              printf("Present but invalid data/CRC error/blank\n");
+              printf("Present but invalid data/CRC error/blank.\n");
+              printf("Initializing EEPROM...\n");
               eep_init(d);
-              printf("EEPROM initialization done, please restart your computer.\n");
           break;
           }
 
