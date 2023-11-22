@@ -1546,7 +1546,7 @@ static uint8_t EepromFileSave(struct device *d)
           EepOptions.SerialNumber[2] = g_pBuffer[i+3];
           EepOptions.SerialNumber[3] = g_pBuffer[i+2];
           break;
-        } else if ((i == 3) &&
+        } else if ((i == 2) &&
                   (g_pBuffer[i] == 0) && 
                   (g_pBuffer[i+1] == 0)) {
           printf("EEPROM came out of initialization,");
