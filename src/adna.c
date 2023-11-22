@@ -75,6 +75,7 @@ struct eep_options {
   u16     ExtraBytes;
   bool bListOnly;
   bool bSerialNumber;
+  bool bIsInit;
 };
 
 struct adna_device {
@@ -372,7 +373,7 @@ void eep_init(struct device *d)
     if (EepOptions.bVerbose)
         printf("Function: %s\n", __func__);
     union eep_status_and_control_reg ctrl_reg = {0};
-    uint32_t init_buffer[3] = {0x00060005,
+    uint32_t init_buffer[3] = {0x0006005a,
                                0x34120042,
                                0xffff7856};
 
@@ -1386,16 +1387,18 @@ static uint8_t EepromFileLoad(struct device *d)
 
     printf("Ok (%dB)\n", (int)FileSize);
 
-    // Load serial number
-    printf("Load Serial Number\n");
-    for (uint8_t i = 0; i < FileSize; i++) {
-      if ((g_pBuffer[i] == 0x42) && 
-          (g_pBuffer[i+1] == 0x00)) {
-        g_pBuffer[i+5] = EepOptions.SerialNumber[0];
-        g_pBuffer[i+4] = EepOptions.SerialNumber[1];
-        g_pBuffer[i+3] = EepOptions.SerialNumber[2];
-        g_pBuffer[i+2] = EepOptions.SerialNumber[3];
-        break;
+    if (!EepOptions.bIsInit) {
+      for (uint8_t i = 0; i < FileSize; i++) {
+        if ((g_pBuffer[i] == 0x42) &&
+            (g_pBuffer[i+1] == 0x00)) {
+          // Load serial number
+          printf("Load Serial Number to buffer\n");
+          g_pBuffer[i+5] = EepOptions.SerialNumber[0];
+          g_pBuffer[i+4] = EepOptions.SerialNumber[1];
+          g_pBuffer[i+3] = EepOptions.SerialNumber[2];
+          g_pBuffer[i+2] = EepOptions.SerialNumber[3];
+          break;
+        }
       }
     }
     printf("Ok\n");
@@ -1537,16 +1540,22 @@ static uint8_t EepromFileSave(struct device *d)
       fclose(pFile);
     } else if ((EepOptions.bSerialNumber == false) && 
                (EepOptions.bLoadFile == true)) {
-      // Save serial number
-      printf("Save Serial Number to buffer\n");
       for (uint8_t i = 0; i < EepSize; i++) {
         if ((g_pBuffer[i] == 0x42) && 
             (g_pBuffer[i+1] == 0x00)) {
+          // Save serial number
+          printf("Save Serial Number to buffer\n");
           EepOptions.SerialNumber[0] = g_pBuffer[i+5];
           EepOptions.SerialNumber[1] = g_pBuffer[i+4];
           EepOptions.SerialNumber[2] = g_pBuffer[i+3];
           EepOptions.SerialNumber[3] = g_pBuffer[i+2];
           break;
+        } else if ((i == 3) &&
+                  (g_pBuffer[i] == 0) && 
+                  (g_pBuffer[i+1] == 0)) {
+          printf("EEPROM came out of initialization,");
+          printf(" using file serial number\n");
+          EepOptions.bIsInit = true;
         }
       }
     } else {}
@@ -1763,6 +1772,7 @@ int main(int argc, char **argv)
 {
   verbose = 2; // flag used by pci process
   int status = EXIT_SUCCESS;
+  EepOptions.bListOnly = false;
 
   if (argc == 2 && !strcmp(argv[1], "--version")) {
     puts("Adnacom version " ADNATOOL_VERSION);
