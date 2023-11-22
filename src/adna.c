@@ -1319,6 +1319,16 @@ static int is_valid_hex(const char *serialnumber) {
     return 1; // Valid hexadecimal value
 }
 
+static bool is_file_exist(FILE **pFile)
+{
+  *pFile = fopen(EepOptions.FileName, "rb");
+  if (*pFile == NULL) {
+      printf("ERROR: Unable to load \"%s\"\n", EepOptions.FileName);
+      return false;
+  }
+  return true;
+}
+
 static uint8_t EepromFileLoad(struct device *d)
 {
     printf("Function: %s\n", __func__);
@@ -1337,11 +1347,8 @@ static uint8_t EepromFileLoad(struct device *d)
     fflush(stdout);
 
     // Open the file to read
-    pFile = fopen(EepOptions.FileName, "rb");
-    if (pFile == NULL) {
-        printf("ERROR: Unable to load \"%s\"\n", EepOptions.FileName);
-        return EEP_FAIL;
-    }
+    if (!is_file_exist(&pFile))
+      return EEP_FAIL;
 
     // Move to end-of-file
     fseek(pFile, 0, SEEK_END);
@@ -1651,6 +1658,8 @@ static uint8_t ProcessCommandLine(int argc, char *argv[])
     bool bGetSerialNumber;
     bGetFileName  = false;
     bGetSerialNumber = false;
+    FILE *pFile;
+
     for (i = 1; i < argc; i++) {
         if (bGetFileName) {
             if (argv[i][0] == '-') {
@@ -1734,8 +1743,11 @@ static uint8_t ProcessCommandLine(int argc, char *argv[])
         return EXIT_FAILURE;
     } else if ((EepOptions.bLoadFile == false) && (EepOptions.bSerialNumber == true)) {
         printf("WARNING: Serial number parameter on Save command will be ignored.\n");
+    } else if (!is_file_exist(&pFile)) {
+        return EXIT_FAILURE;
     } else {}
 
+    fclose(pFile);
     return EXIT_SUCCESS;
 }
 
