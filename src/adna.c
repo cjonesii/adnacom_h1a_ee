@@ -1552,7 +1552,8 @@ static uint8_t EepromFileSave(struct device *d)
           printf("EEPROM came out of initialization,");
           printf(" using file serial number\n");
           EepOptions.bIsInit = true;
-        }
+          break;
+        } else {}
       }
     } else {}
 
