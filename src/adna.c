@@ -316,7 +316,7 @@ void eep_read_16(struct device *d, uint32_t offset, uint16_t *read_buffer)
     ctrl_reg.cmd_n_status_struct.blk_addr = offset;
     eep_data(d, ctrl_reg.cmd_u32, &buffer_32);
 
-    *read_buffer = (buffer_32 >> 16) & 0xFFFF;
+    *read_buffer = (buffer_32 & 0xFFFFFFFF);
     fflush(stdout);
 }
 
@@ -348,7 +348,7 @@ void eep_write_16(struct device *d, uint32_t offset, uint16_t write_buffer)
     if (EepOptions.bVerbose)
         printf("Function: %s\n", __func__);
     union eep_status_and_control_reg ctrl_reg = {0};
-    uint32_t buffer_32 = (uint32_t)write_buffer << 16;
+    uint32_t buffer_32 = (uint32_t)write_buffer;
 
     // Section 6.8.1 step#2
     check_for_ready_or_done(d);
@@ -1394,7 +1394,7 @@ static uint8_t EepromFileLoad(struct device *d)
     printf("Program EEPROM..... \n");
 
     // Write 32-bit aligned buffer into EEPROM
-    for (offset = 0, four_byte_count = 0; offset <= (FileSize & ~0x3); four_byte_count++, offset += sizeof(uint32_t))
+    for (offset = 0, four_byte_count = 0; offset < (FileSize & ~0x3); four_byte_count++, offset += sizeof(uint32_t))
     {
         // Periodically update status
         if ((offset & 0x7) == 0) {
@@ -1421,11 +1421,12 @@ static uint8_t EepromFileLoad(struct device *d)
     // Write any remaining 16-bit unaligned value
     if (offset < FileSize) {
         // Get next value
-        value = *(uint16_t*)(g_pBuffer + offset);
+        value = *(uint32_t*)(g_pBuffer + offset);
+        value |= 0xFFFF0000;
 
         // Write value & read back to verify
-        eep_write_16(d, four_byte_count+1, (uint16_t)value);
-        eep_read_16(d, four_byte_count+1, &Verify_Value_16);
+        eep_write_16(d, four_byte_count, (uint16_t)value);
+        eep_read_16(d, four_byte_count, &Verify_Value_16);
 
         if (Verify_Value_16 != (uint16_t)value) {
             printf("ERROR: offset:%02X  wrote:%04X  read:%04X\n",
