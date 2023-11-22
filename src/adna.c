@@ -1743,7 +1743,7 @@ static uint8_t ProcessCommandLine(int argc, char *argv[])
         return EXIT_FAILURE;
     } else if ((EepOptions.bLoadFile == false) && (EepOptions.bSerialNumber == true)) {
         printf("WARNING: Serial number parameter on Save command will be ignored.\n");
-    } else if (!is_file_exist(&pFile)) {
+    } else if ((is_file_exist(&pFile) == false) && (EepOptions.bLoadFile == true)) {
         return EXIT_FAILURE;
     } else {}
 
