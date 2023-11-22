@@ -1736,18 +1736,20 @@ static uint8_t ProcessCommandLine(int argc, char *argv[])
     }
 
     // Make sure required parameters were provided
-    if (EepOptions.bListOnly  == true) {
+    if (EepOptions.bListOnly == true) {
         // Allow list only
     } else if ((EepOptions.bLoadFile == 0xFF) || (EepOptions.FileName[0] == '\0')) {
         printf("ERROR: EEPROM operation not specified. Use 'adna -h' for usage.\n");
         return EXIT_FAILURE;
     } else if ((EepOptions.bLoadFile == false) && (EepOptions.bSerialNumber == true)) {
         printf("WARNING: Serial number parameter on Save command will be ignored.\n");
-    } else if ((is_file_exist(&pFile) == false) && (EepOptions.bLoadFile == true)) {
-        return EXIT_FAILURE;
+    } else if (EepOptions.bLoadFile == true) {
+        if (!is_file_exist(&pFile))
+          return EXIT_FAILURE;
+        else
+          fclose(pFile);
     } else {}
 
-    fclose(pFile);
     return EXIT_SUCCESS;
 }
 
