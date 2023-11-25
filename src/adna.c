@@ -207,7 +207,7 @@ static uint32_t pcimem(struct pci_dev *p, uint32_t reg, uint32_t data)
     if (read_result != prev_read_result || i == 0)
     {
       if (EepOptions.bVerbose)
-        printf("Reg 0x%04X: 0x%0*lX\n", (int)(target + i * type_width), type_width * 2, read_result);
+        printf("Reg 0x%08X: 0x%08lX\n", (int)(target + i * type_width), read_result);
       read_result_dupped = 0;
     }
     else
