@@ -1592,6 +1592,9 @@ static int eep_process(int j)
               status = EXIT_SUCCESS;
           break;
           case NOT_PRSNT:
+              printf("No EEPROM Present.\n");
+              printf("Please recheck the H1A jumper settings and rerun the utility.\n");
+          break;
           case PRSNT_INVALID:
               eep_init(d);
               status = EXIT_SUCCESS;
