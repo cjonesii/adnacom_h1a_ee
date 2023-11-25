@@ -37,7 +37,7 @@ static int opt_domains;   /* Show domain numbers (0=disabled, 1=auto-detected, 2
 static int opt_kernel;    /* Show kernel drivers */
 char *opt_pcimap;         /* Override path to Linux modules.pcimap */
 static int NumDevices = 0;
-const char program_name[] = "adna";
+const char program_name[] = "h1a_ee";
 char g_h1a_us_port_bar0[256] = "\0";
 uint8_t *g_pBuffer = NULL;
 struct eep_options EepOptions;
@@ -55,14 +55,7 @@ struct adnatool_pci_device {
         u16 did;
         u32 cls_rev;
 } adnatool_pci_devtbl[] = {
-#if 1
         { .vid = PLX_VENDOR_ID,     .did = PLX_H1A_DEVICE_ID, .cls_rev = PCI_CLASS_BRIDGE_PCI, },
-#else
-        /* for debugging purpose, put in some actual PCI devices i have 
-         * in my system. TODO: remove these! */
-        { .vid = 0x8086, .did = 0x02b0, .cls_rev = PCI_CLASS_BRIDGE_PCI, },
-        { .vid = 0x10ec, .did = 0xc82f, .cls_rev = PCI_CLASS_NETWORK_OTHER, },
-#endif
         {0}, /* sentinel */
 
 };
@@ -277,9 +270,6 @@ static void check_for_ready_or_done(struct device *d)
 static void eep_data(struct device *d, uint32_t cmd, volatile uint32_t *buffer)
 {
     if (EepOptions.bVerbose)
-        printf("Function: %s\n", __func__);
-
-    if (EepOptions.bVerbose)
         printf("  EEPROM Control: 0x%08x\n", cmd);
     check_for_ready_or_done(d);
     pcimem(d->dev, EEP_STAT_N_CTRL_ADDR, cmd);
@@ -295,8 +285,6 @@ static void eep_data(struct device *d, uint32_t cmd, volatile uint32_t *buffer)
 
 void eep_read(struct device *d, uint32_t offset, volatile uint32_t *read_buffer)
 {
-    if (EepOptions.bVerbose)
-        printf("Function: %s\n", __func__);
     union eep_status_and_control_reg ctrl_reg = {0};
     // Section 6.8.2 step#2
     ctrl_reg.cmd_n_status_struct.cmd = RD_4B_FR_BLKADDR_TO_BUFF;
@@ -308,8 +296,6 @@ void eep_read(struct device *d, uint32_t offset, volatile uint32_t *read_buffer)
 
 void eep_read_16(struct device *d, uint32_t offset, uint16_t *read_buffer)
 {
-    if (EepOptions.bVerbose)
-        printf("Function: %s\n", __func__);
     union eep_status_and_control_reg ctrl_reg = {0};
     uint32_t buffer_32 = 0;
 
@@ -323,8 +309,6 @@ void eep_read_16(struct device *d, uint32_t offset, uint16_t *read_buffer)
 
 void eep_write(struct device *d, uint32_t offset, uint32_t write_buffer)
 {
-    if (EepOptions.bVerbose)
-        printf("Function: %s\n", __func__);
     union eep_status_and_control_reg ctrl_reg = {0};
 
     // Section 6.8.1 step#2
@@ -346,8 +330,6 @@ void eep_write(struct device *d, uint32_t offset, uint32_t write_buffer)
 
 void eep_write_16(struct device *d, uint32_t offset, uint16_t write_buffer)
 {
-    if (EepOptions.bVerbose)
-        printf("Function: %s\n", __func__);
     union eep_status_and_control_reg ctrl_reg = {0};
     uint32_t buffer_32 = (uint32_t)write_buffer;
 
@@ -370,8 +352,6 @@ void eep_write_16(struct device *d, uint32_t offset, uint16_t write_buffer)
 
 void eep_init(struct device *d)
 {
-    if (EepOptions.bVerbose)
-        printf("Function: %s\n", __func__);
     union eep_status_and_control_reg ctrl_reg = {0};
     uint16_t init_buffer = 0x005a;
 
@@ -392,7 +372,6 @@ void eep_init(struct device *d)
     ctrl_reg.cmd_n_status_struct.addr_width = TWO_BYTES;
     eep_data(d, ctrl_reg.cmd_u32, NULL);
 
-    printf("EEPROM initialization done\n");
     fflush(stdout);
 }
 
@@ -1569,8 +1548,6 @@ static uint8_t EepromFileSave(struct device *d)
 
 static uint8_t EepFile(struct device *d)
 {
-  if (EepOptions.bVerbose)
-    printf("Function: %s\n", __func__);
   if (EepOptions.bLoadFile) {
       if (EepOptions.bSerialNumber == false) {
         printf("Get Serial Number from device\n");
@@ -1611,17 +1588,13 @@ static int eep_process(int j)
           eep_present = (read >> EEP_PRSNT_OFFSET) & 3;;
 
           switch (eep_present) {
-          case NOT_PRSNT:
-              printf("No EEPROM Present\n");
-          break;
           case PRSNT_VALID:
-              printf("EEPROM present with valid data\n");
               status = EXIT_SUCCESS;
           break;
+          case NOT_PRSNT:
           case PRSNT_INVALID:
-              printf("Present but invalid data/CRC error/blank.\n");
-              printf("Initializing EEPROM...\n");
               eep_init(d);
+              status = EXIT_SUCCESS;
           break;
           }
 
