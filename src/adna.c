@@ -1588,14 +1588,15 @@ static int eep_process(int j)
           eep_present = (read >> EEP_PRSNT_OFFSET) & 3;;
 
           switch (eep_present) {
-          case PRSNT_VALID:
-              status = EXIT_SUCCESS;
-          break;
           case NOT_PRSNT:
               printf("No EEPROM Present.\n");
               printf("Please recheck the H1A jumper settings and rerun the utility.\n");
           break;
+          case PRSNT_VALID:
+              status = EXIT_SUCCESS;
+          break;
           case PRSNT_INVALID:
+              printf("EEPROM is blank/corrupted.\n");
               eep_init(d);
               status = EXIT_SUCCESS;
           break;
