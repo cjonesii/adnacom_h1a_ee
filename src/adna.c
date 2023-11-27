@@ -40,7 +40,7 @@ static int NumDevices = 0;
 const char program_name[] = "h1a_ee";
 char g_h1a_us_port_bar0[256] = "\0";
 uint8_t *g_pBuffer = NULL;
-struct eep_options EepOptions;
+static struct eep_options EepOptions;
 
 /*** Our view of the PCI bus ***/
 
@@ -69,6 +69,7 @@ struct eep_options {
   bool bListOnly;
   bool bSerialNumber;
   bool bIsInit;
+  bool bIsNotPresent;
 };
 
 struct adna_device {
@@ -129,7 +130,6 @@ static uint32_t pcimem(struct pci_dev *p, uint32_t reg, uint32_t data)
   int fd;
   void *map_base, *virt_addr;
   uint64_t read_result, writeval, prev_read_result = 0;
-  // char *filename;
   off_t target, target_base;
   int access_type = 'w';
   int items_count = 1;
@@ -161,8 +161,11 @@ static uint32_t pcimem(struct pci_dev *p, uint32_t reg, uint32_t data)
     exit(2);
   }
 
-  if ((fd = open(filename, O_RDWR | O_SYNC)) == -1)
+  if ((fd = open(filename, O_RDWR | O_SYNC)) == -1) {
+    printf("File open error\n");
     PRINT_ERROR;
+  }
+
   if (EepOptions.bVerbose) {
     printf("%s opened.\n", filename);
     printf("Target offset is 0x%x, page size is %ld\n", (int)target, sysconf(_SC_PAGE_SIZE));
@@ -1222,6 +1225,50 @@ void adna_set_d3_flag(int devnum)
   }
 }
 
+static int adna_d0_to_d3(void)
+{
+  struct adna_device *a;
+  char *argv[4];
+  int status = EXIT_SUCCESS;
+
+  for (int i = 0; i < 4; i++) {
+    argv[i] = malloc(14);
+  }
+
+  snprintf(argv[0],
+           14,
+           "%s",
+           "setpci");
+
+  snprintf(argv[1],
+           14,
+           "-s");
+  snprintf(argv[3],
+           14,
+           "%s",
+           "CAP_PM+4.b=3");
+
+  for (a=first_adna; a; a=a->next) {
+    if (a->bIsD3 == true) {
+      snprintf(argv[2], 
+               14,
+               "%02x:%02x.%d",
+               a->bus,
+               a->dev,
+               a->func);
+      status = setpci(4, argv);
+      if (EXIT_FAILURE == status)
+        return status;
+    }
+  }
+
+  for (int i = 0; i < 4; i++) {
+    free(argv[i]);
+  }
+
+  return status;
+}
+
 static int adna_d3_to_d0(void)
 {
   struct adna_device *a;
@@ -1589,24 +1636,24 @@ static int eep_process(int j)
 
           switch (eep_present) {
           case NOT_PRSNT:
+            if (EepOptions.bIsNotPresent) {
               printf("No EEPROM Present.\n");
               printf("Please recheck the H1A jumper settings and rerun the utility.\n");
+            }
+            status = EEP_NOT_EXIST;
           break;
           case PRSNT_VALID:
-              status = EXIT_SUCCESS;
+            status = EXIT_SUCCESS;
           break;
           case PRSNT_INVALID:
-              printf("EEPROM is blank/corrupted.\n");
-              eep_init(d);
-              status = EXIT_SUCCESS;
+            printf("EEPROM is blank/corrupted.\n");
+            eep_init(d);
+            status = EXIT_SUCCESS;
           break;
           }
 
-          if (EXIT_SUCCESS == status) {
-              status = EepFile(d);
-          } else {
-              return status;
-          }
+          if (EXIT_SUCCESS == status)
+            status = EepFile(d);
         }
       }
     }
@@ -1622,7 +1669,7 @@ static void DisplayHelp(void)
         "\n"
         "EEPROM file utility for Adnacom devices.\n"
         "\n"
-        " Usage: adna [-w|-s file | -e] [-n serial_num] [-v]\n"
+        " Usage: h1a_ee [-w|-s file | -e] [-n serial_num] [-v]\n"
         "\n"
         " Options:\n"
         "   -w | -s       Write (-w) file to EEPROM -OR- Save (-s) EEPROM to file\n"
@@ -1634,7 +1681,7 @@ static void DisplayHelp(void)
         "\n"
         "  Sample command\n"
         "  -----------------\n"
-        "  adna -w MyEeprom.bin\n"
+        "  sudo ./h1a_ee -w MyEeprom.bin\n"
         "\n"
         );
 }
@@ -1745,8 +1792,10 @@ static uint8_t ProcessCommandLine(int argc, char *argv[])
 int main(int argc, char **argv)
 {
   verbose = 2; // flag used by pci process
-  int status = EXIT_SUCCESS;
+  static int status = EXIT_SUCCESS;
   EepOptions.bListOnly = false;
+  EepOptions.bIsInit = false;
+  EepOptions.bIsNotPresent = false;
 
   if (argc == 2 && !strcmp(argv[1], "--version")) {
     puts("Adnacom version " ADNATOOL_VERSION);
@@ -1786,9 +1835,16 @@ int main(int argc, char **argv)
     }
   }
 
-  status = eep_process(num);
-  if (status == EXIT_FAILURE)
+  status = eep_process(num); // first check
+
+  if (status == EXIT_SUCCESS)
     goto __exit;
+  else if (status == EEP_NOT_EXIST) {
+    EepOptions.bIsNotPresent = true;
+    printf("S1.1 and S1.2 switch off routine\n");
+    eep_process(num); // second check
+    goto __exit;
+  } else {}
 
 __exit:
   delete_adna_list();
