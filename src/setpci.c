@@ -782,6 +782,8 @@ static struct group *new_group(void)
 
 static void parse_ops(int argc, char **argv, int i)
 {
+  first_group = NULL;
+  last_group = &first_group;
   struct group *group = NULL;
 
   while (i < argc)
