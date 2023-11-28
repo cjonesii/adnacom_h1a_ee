@@ -1771,6 +1771,9 @@ static int eep_process(int j)
     eep_init(d);
     status = EXIT_SUCCESS;
   break;
+  default:
+    printf("This code should not be reached\n");
+  break;
   }
 
   if (EXIT_SUCCESS == status)
