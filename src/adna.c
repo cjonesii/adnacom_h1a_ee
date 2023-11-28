@@ -80,6 +80,8 @@ struct adna_device {
   int devnum;         /* Assigned NumDevice */
 };
 
+enum { BUFFSZ_BIG = 256, BUFFSZ_SMALL = 32 };
+
 int pci_get_devtype(struct pci_dev *pdev);
 bool pci_is_upstream(struct pci_dev *pdev);
 bool pcidev_is_adnacom(struct pci_dev *p);
@@ -1198,7 +1200,6 @@ static int adna_delete_list(void)
 
 static int save_to_adna_list(void)
 {
-  enum { BUFFSZ_BIG = 256, BUFFSZ_SMALL = 32 };
   struct device *d;
   struct adna_device *a;
   struct pci_filter *this, *parent;
@@ -1384,6 +1385,7 @@ static int adna_populate_parent(int num)
 {
   struct adna_device *a;
   struct pci_dev *p;
+  char mfg_str[BUFFSZ_SMALL];
 
   a = adna_get_adnadevice_from_devnum(num);
   if (NULL == a)
@@ -1400,9 +1402,9 @@ static int adna_populate_parent(int num)
         (a->parent->bus == p->bus) &&
         (a->parent->slot == p->dev) &&
         (a->parent->func == p->func)) {
-      a->parent->vendor = p->vendor_id;
-      a->parent->device = p->device_id;
-      a->parent->device_class = p->device_class;
+      snprintf(mfg_str, sizeof(mfg_str), "%04x:%04x:%04x",
+               p->vendor_id, p->device_id, p->device_class);
+      pci_filter_parse_id(a->parent, mfg_str);
     }
   }
   pci_cleanup(pacc);
