@@ -1236,6 +1236,7 @@ static int save_to_adna_list(void)
         /* handle error condition */
       }
       snprintf(base, sizeof(base), "%s", basename(dirname(buf)));
+      printf("%s", base);
       pci_filter_parse_slot(parent, base);
       a->parent = parent;
 
@@ -1377,6 +1378,35 @@ static int adna_d3_to_d0(void)
   }
 
   return status;
+}
+
+static int adna_populate_parent(int num)
+{
+  struct adna_device *a;
+  struct pci_dev *p;
+
+  a = adna_get_adnadevice_from_devnum(num);
+  if (NULL == a)
+    return EXIT_FAILURE;
+
+  pacc = pci_alloc();
+  pacc->error = die;
+  pci_filter_init(pacc, &filter);
+  pci_init(pacc);
+  pci_scan_bus(pacc);
+  for (p=pacc->devices; p; p=p->next) {
+    pci_fill_info(p, PCI_FILL_IDENT | PCI_FILL_BASES | PCI_FILL_CLASS);
+    if ((a->parent->domain == p->domain) &&
+        (a->parent->bus == p->bus) &&
+        (a->parent->slot == p->dev) &&
+        (a->parent->func == p->func)) {
+      a->parent->vendor = p->vendor_id;
+      a->parent->device = p->device_id;
+      a->parent->device_class = p->device_class;
+    }
+  }
+  pci_cleanup(pacc);
+  return EXIT_SUCCESS;
 }
 
 static int adna_hotreset(int num)
@@ -1925,12 +1955,7 @@ int main(int argc, char **argv)
     goto __exit;
   else if (status == EEP_NOT_EXIST) {
     EepOptions.bIsNotPresent = true;
-    printf("S1.1 and S1.2 switch off routine\n");
-    printf("1. Change H1A's Power State from D0 to D3\n");
-    printf("2. Remove H1A\n");
-    printf("3. Issue HotReset to H1A via it's parent port\n");
-    printf("4. Remove parent port\n");
-    printf("5. Rescan\n");
+    adna_populate_parent(num);
     adna_hotreset(num);
     eep_process(num); // second check
     goto __exit;
