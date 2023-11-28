@@ -1266,6 +1266,7 @@ static int adna_pacc_init(void)
 
 static int adna_preprocess(void)
 {
+  first_dev = NULL;
   adna_pacc_init();
   scan_devices();
   sort_them();
