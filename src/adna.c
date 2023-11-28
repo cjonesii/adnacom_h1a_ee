@@ -1322,7 +1322,7 @@ static struct adna_device *adna_get_adnadevice_from_devnum(int num)
 static int adna_setpci_cmd(int command, struct pci_filter *f)
 {
   char *argv[4];
-  int status = EXIT_SUCCESS;
+  volatile int status = EXIT_SUCCESS;
 
   for (int i = 0; i < 4; i++) {
     argv[i] = malloc(SETPCI_STR_SZ);
@@ -1352,8 +1352,10 @@ static int adna_setpci_cmd(int command, struct pci_filter *f)
 
   status = setpci(4, argv);
 
-  for (int i = 0; i < 4; i++) {
-    free(argv[i]);
+  if (EXIT_SUCCESS == status) {
+    for (int i = 0; i < 4; i++) {
+      free(argv[i]);
+    }
   }
 
   return status;
