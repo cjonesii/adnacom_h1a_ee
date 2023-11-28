@@ -19,6 +19,7 @@
 #include <sys/mman.h>
 #include <fcntl.h>
 #include <errno.h>
+#include <libgen.h>
 
 #include "setpci.h"
 
@@ -46,7 +47,7 @@ static struct eep_options EepOptions;
 
 struct pci_access *pacc;
 struct device *first_dev = NULL;
-struct adna_device *first_adna = NULL;
+static struct adna_device *first_adna = NULL;
 static int seen_errors;
 static int need_topology;
 
@@ -74,7 +75,7 @@ struct eep_options {
 
 struct adna_device {
   struct adna_device *next;
-  u8 bus, dev, func;  /* Bus inside domain, device and function */
+  struct pci_filter *this, *parent;
   bool bIsD3;         /* Power state */
   int devnum;         /* Assigned NumDevice */
 };
@@ -113,6 +114,19 @@ static int adnatool_refresh_device_cache(void)
   return 0;
 }
 #endif
+
+static void pci_get_remove(struct pci_filter *f, char *path, size_t pathlen)
+{
+  snprintf(path,
+          pathlen,
+          "/sys/bus/pci/devices/%04x:%02x:%02x.%d/remove",
+          f->domain,
+          f->bus,
+          f->slot,
+          f->func);
+  return;
+}
+
 static void pci_get_res0(struct pci_dev *pdev, char *path, size_t pathlen)
 {
   snprintf(path, 
@@ -1149,11 +1163,34 @@ static void show(void)
       show_verbose(d);
 }
 
-static int delete_adna_list(void)
+/*! @brief Removes the H1A downstream port */
+static void adna_remove_downstream(struct pci_filter *f)
+{
+  char filename[256] = "\0";
+  int dsfd, res;
+  pci_get_remove(f, filename, sizeof(filename));
+  if((dsfd = open(filename, O_WRONLY )) == -1) PRINT_ERROR;
+  if((res = write( dsfd, "1", 1 )) == -1) PRINT_ERROR;
+  close(dsfd);
+}
+
+/*! @brief Rescans the pci bus */
+static void adna_rescan_pci(void)
+{
+    int scanfd, res;
+    if((scanfd = open("/sys/bus/pci/rescan", O_WRONLY )) == -1) PRINT_ERROR;
+    if((res = write( scanfd, "1", 1 )) == -1) PRINT_ERROR;
+    close(scanfd);
+    sleep(1);
+}
+
+static int adna_delete_list(void)
 {
   struct adna_device *a, *b;
   for (a=first_adna;a;a=b) {
     b=a->next;
+    free(a->this);
+    free(a->parent);
     free(a);
   }
   return 0;
@@ -1161,18 +1198,45 @@ static int delete_adna_list(void)
 
 static int save_to_adna_list(void)
 {
+  enum { BUFFSZ_BIG = 256, BUFFSZ_SMALL = 32 };
   struct device *d;
   struct adna_device *a;
+  struct pci_filter *this, *parent;
+  char bdf_str[BUFFSZ_SMALL];
+  char mfg_str[BUFFSZ_SMALL];
+  char bdf_path[BUFFSZ_BIG];
+  char buf[BUFFSZ_BIG];
+  char base[BUFFSZ_BIG];
 
   for (d=first_dev; d; d=d->next) {
     if (d->NumDevice) {
       a = xmalloc(sizeof(struct adna_device));
       memset(a, 0, sizeof(*a));
       a->devnum = d->NumDevice;
-      a->bus = d->dev->bus;
-      a->dev = d->dev->dev;
-      a->func = d->dev->func;
+      this = xmalloc(sizeof(struct pci_filter));
+      memset(this, 0, sizeof(*this));
+      snprintf(bdf_str, sizeof(bdf_str), "%04x:%02x:%02x.%d",
+               d->dev->domain, d->dev->bus, d->dev->dev, d->dev->func);
+      snprintf(mfg_str, sizeof(mfg_str), "%04x:%04x:%04x",
+               d->dev->vendor_id, d->dev->device_id, d->dev->device_class);
+      pci_filter_parse_slot(this, bdf_str);
+      pci_filter_parse_id(this, mfg_str);
+      a->this = this;
       a->bIsD3 = false;
+
+      parent = xmalloc(sizeof(struct pci_filter));
+      memset(parent, 0, sizeof(*parent));
+      snprintf(bdf_path, sizeof(bdf_path), "/sys/bus/pci/devices/%s", bdf_str);
+      ssize_t len = readlink(bdf_path, buf, sizeof(buf)-1);
+      if (len != -1) {
+        buf[len] = '\0';
+      } else {
+        /* handle error condition */
+      }
+      snprintf(base, sizeof(base), "%s", basename(dirname(buf)));
+      pci_filter_parse_slot(parent, base);
+      a->parent = parent;
+
       a->next = first_adna;
       first_adna = a;
     }
@@ -1196,12 +1260,17 @@ static int adna_pacc_init(void)
   return 0;
 }
 
-static int adna_pci_process(void)
+static int adna_preprocess(void)
 {
   adna_pacc_init();
   scan_devices();
   sort_them();
+  return 0;
+}
 
+static int adna_pci_process(void)
+{
+  adna_preprocess();
   NumDevices = count_upstream();
   if (NumDevices == 0) {
     printf("No Adnacom device detected.\n");
@@ -1225,42 +1294,62 @@ void adna_set_d3_flag(int devnum)
   }
 }
 
-static int adna_d0_to_d3(void)
+static struct device *adna_get_device_from_adnadevice(struct adna_device *a)
+{
+  struct device *d;
+  for (d=first_dev; d; d=d->next) { // loop through the pacc list
+    if (pci_filter_match(a->this, d->dev)) { // to locate the pci dev
+      return d;
+    }
+  }
+  return NULL;
+}
+
+static struct adna_device *adna_get_adnadevice_from_devnum(int num)
 {
   struct adna_device *a;
+  for (a=first_adna; a; a=a->next) { // loop through adnacom device list
+    if (num == a->devnum) {          // to locate the target NumDevice
+      return a;
+    }
+  }
+  return NULL;
+}
+
+#define SETPCI_STR_SZ   (32)
+static int adna_setpci_cmd(int command, struct pci_filter *f)
+{
   char *argv[4];
   int status = EXIT_SUCCESS;
 
   for (int i = 0; i < 4; i++) {
-    argv[i] = malloc(14);
+    argv[i] = malloc(SETPCI_STR_SZ);
   }
 
-  snprintf(argv[0],
-           14,
-           "%s",
-           "setpci");
+  snprintf(argv[0], SETPCI_STR_SZ, "%s", "setpci");
+  snprintf(argv[1], SETPCI_STR_SZ, "%s", "-s");
+  snprintf(argv[2], SETPCI_STR_SZ, "%02x:%02x.%d",
+           f->bus, f->slot, f->func);
 
-  snprintf(argv[1],
-           14,
-           "-s");
-  snprintf(argv[3],
-           14,
-           "%s",
-           "CAP_PM+4.b=3");
-
-  for (a=first_adna; a; a=a->next) {
-    if (a->bIsD3 == true) {
-      snprintf(argv[2], 
-               14,
-               "%02x:%02x.%d",
-               a->bus,
-               a->dev,
-               a->func);
-      status = setpci(4, argv);
-      if (EXIT_FAILURE == status)
-        return status;
-    }
+  switch (command) {
+    case D3_TO_D0:
+      snprintf(argv[3], SETPCI_STR_SZ, "%s","CAP_PM+4.b=0");
+    break;
+    case D0_TO_D3:
+      snprintf(argv[3], SETPCI_STR_SZ, "%s","CAP_PM+4.b=3");
+    break;
+    case HOTRESET_ENABLE:
+      snprintf(argv[3], SETPCI_STR_SZ, "%s","BRIDGE_CONTROL.b=0x52");
+    break;
+    case HOTRESET_DISABLE:
+      snprintf(argv[3], SETPCI_STR_SZ, "%s","BRIDGE_CONTROL.b=0x12");
+    break;
+    default:
+      snprintf(argv[3], SETPCI_STR_SZ, "%s","BRIDGE_CONTROL");
+    break;
   }
+
+  status = setpci(4, argv);
 
   for (int i = 0; i < 4; i++) {
     free(argv[i]);
@@ -1272,44 +1361,41 @@ static int adna_d0_to_d3(void)
 static int adna_d3_to_d0(void)
 {
   struct adna_device *a;
-  char *argv[4];
   int status = EXIT_SUCCESS;
-
-  for (int i = 0; i < 4; i++) {
-    argv[i] = malloc(14);
-  }
-
-  snprintf(argv[0],
-           14,
-           "%s",
-           "setpci");
-
-  snprintf(argv[1],
-           14,
-           "-s");
-  snprintf(argv[3],
-           14,
-           "%s",
-           "CAP_PM+4.b=0");
 
   for (a=first_adna; a; a=a->next) {
     if (a->bIsD3 == true) {
-      snprintf(argv[2], 
-               14,
-               "%02x:%02x.%d",
-               a->bus,
-               a->dev,
-               a->func);
-      status = setpci(4, argv);
-      if (EXIT_FAILURE == status)
-        return status;
+      status = adna_setpci_cmd(D3_TO_D0, a->this);
+      if (EXIT_FAILURE == status) {
+        seen_errors++;
+        printf("Cannot change power state of this H1A\n");
+      }
     }
   }
 
-  for (int i = 0; i < 4; i++) {
-    free(argv[i]);
-  }
+  return status;
+}
 
+static int adna_hotreset(int num)
+{
+  struct adna_device *a;
+  int status = EXIT_SUCCESS;
+
+  a = adna_get_adnadevice_from_devnum(num);
+  if (NULL == a)
+    return EXIT_FAILURE;
+  status = adna_setpci_cmd(D0_TO_D3, a->this);
+  if (EXIT_FAILURE == status) {
+    printf("Cannot change power state of this H1A\n");
+    return status;
+  }
+  adna_remove_downstream(a->this);
+
+  adna_setpci_cmd(HOTRESET_ENABLE, a->parent);
+  adna_setpci_cmd(HOTRESET_DISABLE, a->parent);
+  adna_remove_downstream(a->parent);
+
+  adna_rescan_pci();
   return status;
 }
 
@@ -1614,50 +1700,45 @@ static int eep_process(int j)
   uint32_t read;
   int status = EXIT_FAILURE;
 
-  adna_pacc_init();
-  scan_devices();
-  sort_them();
+  adna_preprocess();
 
-  for (a=first_adna; a; a=a->next) { // loop through adnacom device list
-    if (j == a->devnum) {          // to locate the target NumDevice
-      for (d=first_dev; d; d=d->next) { // loop through the pacc list
-        if ((a->bus == d->dev->bus) &&
-            (a->dev == d->dev->dev) &&
-            (a->func == d->dev->func)) { // to locate the pci dev
-          check_for_ready_or_done(d);
-          read = pcimem(d->dev, EEP_STAT_N_CTRL_ADDR, 0);
-          check_for_ready_or_done(d);
-          if (read == PCI_MEM_ERROR) {
-            printf("Unexpected error. Exiting.\n");
-            exit(-1);
-          }
+  a = adna_get_adnadevice_from_devnum(j);
+  if (NULL == a)
+    exit(-1);
+  d = adna_get_device_from_adnadevice(a);
+  if (NULL == d)
+    exit(-1);
 
-          eep_present = (read >> EEP_PRSNT_OFFSET) & 3;;
-
-          switch (eep_present) {
-          case NOT_PRSNT:
-            if (EepOptions.bIsNotPresent) {
-              printf("No EEPROM Present.\n");
-              printf("Please recheck the H1A jumper settings and rerun the utility.\n");
-            }
-            status = EEP_NOT_EXIST;
-          break;
-          case PRSNT_VALID:
-            status = EXIT_SUCCESS;
-          break;
-          case PRSNT_INVALID:
-            printf("EEPROM is blank/corrupted.\n");
-            eep_init(d);
-            status = EXIT_SUCCESS;
-          break;
-          }
-
-          if (EXIT_SUCCESS == status)
-            status = EepFile(d);
-        }
-      }
-    }
+  check_for_ready_or_done(d);
+  read = pcimem(d->dev, EEP_STAT_N_CTRL_ADDR, 0);
+  check_for_ready_or_done(d);
+  if (read == PCI_MEM_ERROR) {
+    printf("Unexpected error. Exiting.\n");
+    exit(-1);
   }
+
+  eep_present = (read >> EEP_PRSNT_OFFSET) & 3;;
+
+  switch (eep_present) {
+  case NOT_PRSNT:
+    if (EepOptions.bIsNotPresent) {
+      printf("No EEPROM Present.\n");
+      printf("Please recheck the H1A jumper settings and rerun the utility.\n");
+    }
+    status = EEP_NOT_EXIST;
+  break;
+  case PRSNT_VALID:
+    status = EXIT_SUCCESS;
+  break;
+  case PRSNT_INVALID:
+    printf("EEPROM is blank/corrupted.\n");
+    eep_init(d);
+    status = EXIT_SUCCESS;
+  break;
+  }
+
+  if (EXIT_SUCCESS == status)
+    status = EepFile(d);
 
   adna_pacc_cleanup();
   return status;
@@ -1842,11 +1923,17 @@ int main(int argc, char **argv)
   else if (status == EEP_NOT_EXIST) {
     EepOptions.bIsNotPresent = true;
     printf("S1.1 and S1.2 switch off routine\n");
+    printf("1. Change H1A's Power State from D0 to D3\n");
+    printf("2. Remove H1A\n");
+    printf("3. Issue HotReset to H1A via it's parent port\n");
+    printf("4. Remove parent port\n");
+    printf("5. Rescan\n");
+    adna_hotreset(num);
     eep_process(num); // second check
     goto __exit;
   } else {}
 
 __exit:
-  delete_adna_list();
+  adna_delete_list();
   return (seen_errors ? 2 : 0);
 }
