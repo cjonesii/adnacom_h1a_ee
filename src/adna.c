@@ -1219,6 +1219,8 @@ static int save_to_adna_list(void)
                d->dev->domain, d->dev->bus, d->dev->dev, d->dev->func);
       snprintf(mfg_str, sizeof(mfg_str), "%04x:%04x:%04x",
                d->dev->vendor_id, d->dev->device_id, d->dev->device_class);
+      snprintf(bdf_path, sizeof(bdf_path), "/sys/bus/pci/devices/%s", bdf_str);
+
       pci_filter_parse_slot(this, bdf_str);
       pci_filter_parse_id(this, mfg_str);
       a->this = this;
@@ -1226,7 +1228,7 @@ static int save_to_adna_list(void)
 
       parent = xmalloc(sizeof(struct pci_filter));
       memset(parent, 0, sizeof(*parent));
-      snprintf(bdf_path, sizeof(bdf_path), "/sys/bus/pci/devices/%s", bdf_str);
+
       ssize_t len = readlink(bdf_path, buf, sizeof(buf)-1);
       if (len != -1) {
         buf[len] = '\0';
@@ -1328,8 +1330,7 @@ static int adna_setpci_cmd(int command, struct pci_filter *f)
 
   snprintf(argv[0], SETPCI_STR_SZ, "%s", "setpci");
   snprintf(argv[1], SETPCI_STR_SZ, "%s", "-s");
-  snprintf(argv[2], SETPCI_STR_SZ, "%02x:%02x.%d",
-           f->bus, f->slot, f->func);
+  snprintf(argv[2], SETPCI_STR_SZ, "%02x:%02x.%d", f->bus, f->slot, f->func);
 
   switch (command) {
     case D3_TO_D0:
