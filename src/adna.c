@@ -1266,21 +1266,26 @@ static int adna_pacc_init(void)
 
 static int adna_preprocess(void)
 {
-  // first_dev = NULL;
+  first_dev = NULL;
   adna_pacc_init();
   scan_devices();
   sort_them();
   return 0;
 }
 
-static int adna_pci_process(void)
+static void adna_dev_list_init(void)
 {
   adna_preprocess();
   NumDevices = count_upstream();
   if (NumDevices == 0) {
     printf("No Adnacom device detected.\n");
-    return -1;
+    exit(-1);
   }
+}
+
+static int adna_pci_process(void)
+{
+  adna_dev_list_init();
 
   save_to_adna_list();
   show();
@@ -1428,8 +1433,11 @@ static int adna_hotreset(int num)
   adna_remove_downstream(a->this);
 
   adna_setpci_cmd(HOTRESET_ENABLE, a->parent);
+  sleep(1);
   adna_setpci_cmd(HOTRESET_DISABLE, a->parent);
+  sleep(1);
   adna_remove_downstream(a->parent);
+  sleep(1);
 
   adna_rescan_pci();
   return status;
@@ -1736,7 +1744,7 @@ static int eep_process(int j)
   uint32_t read;
   int status = EXIT_FAILURE;
 
-  adna_preprocess();
+  adna_dev_list_init();
 
   a = adna_get_adnadevice_from_devnum(j);
   if (NULL == a)
