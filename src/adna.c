@@ -1236,7 +1236,7 @@ static int save_to_adna_list(void)
         /* handle error condition */
       }
       snprintf(base, sizeof(base), "%s", basename(dirname(buf)));
-      printf("%s", base);
+
       pci_filter_parse_slot(parent, base);
       a->parent = parent;
 
