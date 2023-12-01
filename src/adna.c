@@ -1902,7 +1902,7 @@ static uint8_t ProcessCommandLine(int argc, char *argv[])
     if (EepOptions.bListOnly == true) {
         // Allow list only
     } else if ((EepOptions.bLoadFile == 0xFF) || (EepOptions.FileName[0] == '\0')) {
-        printf("ERROR: EEPROM operation not specified. Use 'adna -h' for usage.\n");
+        printf("ERROR: EEPROM operation not specified. Use 'h1a_ee -h' for usage.\n");
         return EXIT_FAILURE;
     } else if ((EepOptions.bLoadFile == false) && (EepOptions.bSerialNumber == true)) {
         printf("WARNING: Serial number parameter on Save command will be ignored.\n");
