@@ -25,7 +25,7 @@
 
 #define PLX_VENDOR_ID       (0x10B5)
 #define PLX_H1A_DEVICE_ID   (0x8608)
-#define ADNATOOL_VERSION    "0.0.1"
+#define ADNATOOL_VERSION    "0.0.2"
 
 /* Options */
 
@@ -372,7 +372,7 @@ void eep_write_16(struct device *d, uint32_t offset, uint16_t write_buffer)
 void eep_init(struct device *d)
 {
     union eep_status_and_control_reg ctrl_reg = {0};
-    uint16_t init_buffer = 0x005a;
+    uint32_t init_buffer = 0x0000005a;
 
     // Section 6.8.3 step#2
     check_for_ready_or_done(d);
