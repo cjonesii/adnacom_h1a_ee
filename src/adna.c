@@ -91,6 +91,7 @@ void eep_read_16(struct device *d, uint32_t offset, uint16_t *read_buffer);
 void eep_write(struct device *d, uint32_t offset, uint32_t write_buffer);
 void eep_write_16(struct device *d, uint32_t offset, uint16_t write_buffer);
 void eep_init(struct device *d);
+void eep_erase(struct device *d);
 #ifndef ADNA
 static int adnatool_refresh_device_cache(void)
 {
