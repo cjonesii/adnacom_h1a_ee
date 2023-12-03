@@ -25,7 +25,7 @@
 
 #define PLX_VENDOR_ID       (0x10B5)
 #define PLX_H1A_DEVICE_ID   (0x8608)
-#define ADNATOOL_VERSION    "0.0.2"
+#define ADNATOOL_VERSION    "0.0.3"
 
 /* Options */
 
@@ -1803,7 +1803,7 @@ static int eep_process(int j)
   case PRSNT_INVALID:
     printf("EEPROM is blank/corrupted.\n");
     eep_init(d);
-    status = EXIT_SUCCESS;
+    status = EEP_BLANK_INVALID;
   break;
   default:
     printf("This code should not be reached\n");
@@ -1999,7 +1999,13 @@ int main(int argc, char **argv)
     adna_hotreset(num);
     eep_process(num); // second check
     goto __exit;
-  } else {}
+  }
+  else if (status == EEP_BLANK_INVALID) {
+    adna_populate_parent(num);
+    adna_hotreset(num);
+    eep_process(num); // second check
+  }
+  else {}
 
 __exit:
   adna_delete_list();
