@@ -351,7 +351,7 @@ void eep_write(struct device *d, uint32_t offset, uint32_t write_buffer)
 void eep_write_16(struct device *d, uint32_t offset, uint16_t write_buffer)
 {
     union eep_status_and_control_reg ctrl_reg = {0};
-    uint32_t buffer_32 = (uint32_t)write_buffer;
+    uint32_t buffer_32 = 0xffff0000 | (uint32_t)write_buffer; // set the 16bit MSB side to 0xffff (so write won't be ignored)
 
     // Section 6.8.1 step#2
     check_for_ready_or_done(d);
@@ -1615,12 +1615,11 @@ static uint8_t EepromFileLoad(struct device *d)
     if (offset < FileSize) {
         // Get next value
         value = *(uint32_t*)(g_pBuffer + offset); // expected is that only 16bit value remains
-        // value |= 0xFFFF0000;                      // so set the 16bit on MSB half to 0xffff
-        printf("16bit Value: 0x%08x\n", value);
+        value |= 0xFFFF0000;                      // so set the 16bit on MSB half to 0xffff (this is only for the comparison)
 
         // Write value & read back to verify
         eep_write_16(d, four_byte_count, (uint16_t)value); // then only half was written? what's the sense of the OR operation above?
-        eep_read_16(d, four_byte_count, &Verify_Value_16); // why was the last written 32bit value read here?
+        eep_read_16(d, four_byte_count, &Verify_Value_16); // why was the last written 32bit value read here? write of zero is ignored?
 
         if (Verify_Value_16 != (uint16_t)value) {
             printf("ERROR W16: offset:0x%02X  wrote:0x%08X  read:0x%08X\n",
