@@ -25,7 +25,7 @@
 
 #define PLX_VENDOR_ID       (0x10B5)
 #define PLX_H1A_DEVICE_ID   (0x8608)
-#define ADNATOOL_VERSION    "0.0.3"
+#define ADNATOOL_VERSION    "0.0.4"
 
 /* Options */
 
