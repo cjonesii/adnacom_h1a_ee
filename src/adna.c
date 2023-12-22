@@ -280,7 +280,7 @@ static void check_for_ready_or_done(struct device *d)
 {
     volatile uint32_t eepCmdStatus = EEP_CMD_STAT_MAX;
     do {
-        for (volatile int delay = 0; delay < 5000; delay++) {}
+        for (volatile int delay = 0; delay < 10000; delay++) {}
         eepCmdStatus = ((pcimem(d->dev, EEP_STAT_N_CTRL_ADDR, 0)) >> EEP_CMD_STATUS_OFFSET) & 1;
     } while (CMD_COMPLETE != eepCmdStatus);
     if (EepOptions.bVerbose)
@@ -1587,7 +1587,7 @@ static uint8_t EepromFileLoad(struct device *d)
     printf("Program EEPROM..... \n");
 
     // Write 32-bit aligned buffer into EEPROM
-    for (offset = 0, four_byte_count = 0; offset < (FileSize & ~0x3); four_byte_count++, offset += sizeof(uint32_t))
+    for (offset = 0, four_byte_count = 0; offset < (FileSize & ~0x3); ++four_byte_count, offset += sizeof(uint32_t))
     {
         // Periodically update status
         if ((offset & 0x7) == 0) {
@@ -1604,7 +1604,7 @@ static uint8_t EepromFileLoad(struct device *d)
         eep_read(d, four_byte_count, &Verify_Value);
 
         if (Verify_Value != value) {
-            printf("ERROR: offset:%02X  wrote:%08X  read:%08X\n",
+            printf("ERROR W32: offset:0x%02X  wrote:0x%08X  read:0x%08X\n",
                    offset, value, Verify_Value);
             rc = EEP_FAIL;
             goto _Exit_File_Load;
@@ -1614,15 +1614,16 @@ static uint8_t EepromFileLoad(struct device *d)
     // Write any remaining 16-bit unaligned value
     if (offset < FileSize) {
         // Get next value
-        value = *(uint32_t*)(g_pBuffer + offset);
-        value |= 0xFFFF0000;
+        value = *(uint32_t*)(g_pBuffer + offset); // expected is that only 16bit value remains
+        // value |= 0xFFFF0000;                      // so set the 16bit on MSB half to 0xffff
+        printf("16bit Value: 0x%08x\n", value);
 
         // Write value & read back to verify
-        eep_write_16(d, four_byte_count, (uint16_t)value);
-        eep_read_16(d, four_byte_count, &Verify_Value_16);
+        eep_write_16(d, four_byte_count, (uint16_t)value); // then only half was written? what's the sense of the OR operation above?
+        eep_read_16(d, four_byte_count, &Verify_Value_16); // why was the last written 32bit value read here?
 
         if (Verify_Value_16 != (uint16_t)value) {
-            printf("ERROR: offset:%02X  wrote:%04X  read:%04X\n",
+            printf("ERROR W16: offset:0x%02X  wrote:0x%08X  read:0x%08X\n",
                    offset, value, Verify_Value_16);
             goto _Exit_File_Load;
         }
